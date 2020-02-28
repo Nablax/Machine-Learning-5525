@@ -10,20 +10,20 @@ def svmfit(X, y, c):
     q = cvxopt.matrix(-np.ones((train_size, 1)))
     G = cvxopt.matrix(np.vstack((-np.eye(train_size),np.eye(train_size))))
     h = cvxopt.matrix(np.hstack((np.zeros(train_size), np.ones(train_size) * c)))
-    A = cvxopt.matrix(y.reshape(1, -1))
-    b = cvxopt.matrix(np.zeros(1))
-    sol = cvxopt.solvers.qp(P, q, G, h, A, b)
+    # A = cvxopt.matrix(y.reshape(1, -1))
+    # b = cvxopt.matrix(np.zeros(1))
+    sol = cvxopt.solvers.qp(P, q, G, h)
     lambda_sol = np.array(sol['x'])
     w = ((y * lambda_sol).T @ X).reshape(-1, 1)
-    sv = (lambda_sol > 1e-4).flatten()
-    y_train_support = y[sv].reshape(-1, 1)
-    X_train_support = X[sv]
-    a = (1 / y_train_support) - X_train_support @ w
-    b = np.mean((1 / y_train_support) - X_train_support @ w)
-    return w, b
+    # sv = (lambda_sol > 1e-5).flatten()
+    # y_train_support = y[sv].reshape(-1, 1)
+    # X_train_support = X[sv]
+    # aa = (1 / y_train_support) - X_train_support @ w
+    # b = np.mean((1 / y_train_support) - X_train_support @ w)
+    return w
 
-def predict(X, w, b):
-    y_pred = np.sign(X @ w + b)
+def predict(X, w):
+    y_pred = np.sign(X @ w)
     return y_pred
 
 def compute_accuracy(y, y_pred):
@@ -43,10 +43,10 @@ def k_fold_cv(traindata, testdata, k, c):
     train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
     for i in range(k):
         X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i)
-        w, b = svmfit(X_train, y_train, c)
-        y_pred_train = predict(X_train, w, b)
-        y_pred_valid = predict(X_valid, w, b)
-        y_pred_test = predict(X_test, w, b)
+        w = svmfit(X_train, y_train, c)
+        y_pred_train = predict(X_train, w)
+        y_pred_valid = predict(X_valid, w)
+        y_pred_test = predict(X_test, w)
         train_accuracy_list.append(compute_accuracy(y_train, y_pred_train))
         cv_accuracy_list.append(compute_accuracy(y_valid, y_pred_valid))
         test_accuracy_list.append(compute_accuracy(y_test, y_pred_test))
@@ -89,7 +89,8 @@ if __name__ == "__main__":
         train_accuracy_list.append(train_accuracy)
         cv_accuracy_list.append(cv_accuracy)
         test_accuracy_list.append(test_accuracy)
-    plt.plot(train_accuracy_list)
-    plt.plot(test_accuracy_list)
-    plt.plot(cv_accuracy_list)
+    plt.plot(train_accuracy_list, label='train')
+    plt.plot(test_accuracy_list, label='test')
+    plt.plot(cv_accuracy_list, label='cv')
+    plt.legend()
     plt.show()
