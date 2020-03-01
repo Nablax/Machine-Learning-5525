@@ -25,6 +25,7 @@ def svmfit(X, y, c):
     print('b = ', b)
     return w, b
 
+
 def predict(X, w, b):
     y_pred = np.sign(X @ w + b)
     return y_pred
@@ -92,6 +93,8 @@ if __name__ == "__main__":
         train_accuracy_list.append(train_accuracy)
         cv_accuracy_list.append(cv_accuracy)
         test_accuracy_list.append(test_accuracy)
+    c_list_label = ['0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000']
+    plt.xticks(np.arange(len(c_list_label)), c_list_label)
     plt.plot(train_accuracy_list, label='train')
     plt.plot(test_accuracy_list, label='test')
     plt.plot(cv_accuracy_list, label='cv')

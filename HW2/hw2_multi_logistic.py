@@ -55,9 +55,11 @@ def fc_backward(dl_dy, x, w, b, y):
 
 
 # train single layer perceptron
-def train_slp(mini_batch_x, mini_batch_y):
+def minist_train(X, y, learning_rate=0.32):
     # TO DO
-    l_r = 0.32
+    mini_batch_x = X
+    mini_batch_y = y
+    l_r = learning_rate
     d_r = 0.5
     w = np.random.normal(0, 1, (mini_batch_y.shape[1], mini_batch_x.shape[1]))
     b = np.zeros((mini_batch_y.shape[1], 1))
@@ -92,31 +94,35 @@ def read_data_mfeat(data_label_file):
     y = data[:, -1].reshape((1, -1)).astype(np.int64)
     return X, y
 
-def main_slp():
+def minist_predict(w, b, X):
+    X_len = X.shape[1]
+    y_pred = np.zeros((X_len))
+    for i in range(X_len):
+        x = X[:, [i]]
+        y = fc(x, w, b)
+        y_pred[i] = np.argmax(y)
+    return y_pred
+
+if __name__ == '__main__':
     mnist_train_X, mnist_train_y = read_data_mfeat('mfeat_train.csv')
     mnist_test_X, mnist_test_y = read_data_mfeat('mfeat_test.csv')
     batch_size = 30
     mini_batch_x, mini_batch_y = get_mini_batch(mnist_train_X, mnist_train_y, batch_size)
-    w, b = train_slp(mini_batch_x, mini_batch_y)
+    w, b = minist_train(mini_batch_x, mini_batch_y)
     # sio.savemat('slp.mat', mdict={'w': w, 'b': b})
-
+    y_pred = minist_predict(w, b, mnist_test_X)
     acc = 0
     confusion = np.zeros((10, 10))
     num_test = mnist_test_X.shape[1]
     for i in range(num_test):
-        x = mnist_test_X[:, [i]]
-        y = fc(x, w, b)
-        l_pred = np.argmax(y)
+        l_pred = int(y_pred[i])
         confusion[l_pred, mnist_test_y[0, i] - 1] = confusion[l_pred, mnist_test_y[0, i] - 1] + 1
-
         if l_pred == mnist_test_y[0, i] - 1:
             acc = acc + 1
     accuracy = acc / num_test
     for i in range(10):
         confusion[:, i] = confusion[:, i] / np.sum(confusion[:, i])
 
-    label_classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    label_classes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
     visualize_confusion_matrix(confusion, accuracy, label_classes, 'Single-layer Perceptron Confusion Matrix')
 
-if __name__ == '__main__':
-    main_slp()

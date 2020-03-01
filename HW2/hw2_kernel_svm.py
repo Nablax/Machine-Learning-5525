@@ -4,14 +4,15 @@ import matplotlib.pyplot as plt
 import cvxopt
 
 def gaussian_kernel(x1, x2, sigma=5):
-    return np.exp(-np.linalg.norm(x1 - x2)**2 / (2 * (sigma ** 2)))
+    return np.exp(-np.linalg.norm(x1 - x2, axis=-1)**2 / (2 * (sigma ** 2)))
 
 def rbf_svm_train(X, y, c, sigma):
     train_size = X.shape[0]
     K = np.zeros((train_size, train_size))
+    tmp_X = np.zeros((train_size, 2))
     for i in range(train_size):
-        for j in range(train_size):
-            K[i, j]= gaussian_kernel(X[i], X[j], sigma)
+        tmp_X[:] = X[i]
+        K[i]= gaussian_kernel(X, tmp_X, sigma)
     P = cvxopt.matrix((y @ y.T) * K)
     q = cvxopt.matrix(-np.ones((train_size, 1)))
     G = cvxopt.matrix(np.vstack((-np.eye(train_size), np.eye(train_size))))
@@ -35,6 +36,21 @@ def predict(test_X, train_X, train_y, alpha, sigma):
         y_pred[i]=np.sign(tmp)
     return y_pred
 
+def predict2(test_X, train_X, train_y, alpha, sigma):
+    sv = (alpha > 1e-5).flatten()
+    alpha_sv = alpha[sv]
+    y_train_sv = train_y[sv].reshape(-1, 1)
+    X_train_sv = train_X[sv]
+    X_test_size = test_X.shape[0]
+    X_sv_size = alpha_sv.shape[0]
+    y_pred = np.zeros((X_test_size, 1))
+    tmp = np.zeros_like(X_train_sv)
+    for i in range(X_test_size):
+        tmp[:] = test_X[i]
+        y_pred[i] = np.sum(alpha_sv * y_train_sv * gaussian_kernel(tmp, X_train_sv, sigma).reshape((-1, 1)))
+    y_pred = np.sign(y_pred)
+    return y_pred
+
 def compute_accuracy(y, y_pred):
     data_size = y.shape[0]
     if data_size != y_pred.shape[0]:
@@ -54,9 +70,9 @@ def k_fold_cv(traindata, testdata, k, c):
     for i in range(k):
         X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i)
         alpha = rbf_svm_train(X_train, y_train, c, sigma)
-        y_pred_train = predict(X_train, X_train, y_train, alpha, sigma)
-        y_pred_valid = predict(X_valid, X_train, y_train, alpha, sigma)
-        y_pred_test = predict(X_test, X_train, y_train, alpha, sigma)
+        y_pred_train = predict2(X_train, X_train, y_train, alpha, sigma)
+        y_pred_valid = predict2(X_valid, X_train, y_train, alpha, sigma)
+        y_pred_test = predict2(X_test, X_train, y_train, alpha, sigma)
         train_accuracy_list.append(compute_accuracy(y_train, y_pred_train))
         cv_accuracy_list.append(compute_accuracy(y_valid, y_pred_valid))
         test_accuracy_list.append(compute_accuracy(y_test, y_pred_test))

@@ -3,15 +3,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import cvxopt
 
+def visualize_confusion_matrix(confusion, accuracy, label_classes, name):
+    plt.title("{}, accuracy = {:.3f}".format(name, accuracy))
+    plt.imshow(confusion)
+    ax, fig = plt.gca(), plt.gcf()
+    plt.xticks(np.arange(len(label_classes)), label_classes)
+    plt.yticks(np.arange(len(label_classes)), label_classes)
+    ax.set_xticks(np.arange(len(label_classes) + 1) - .5, minor=True)
+    ax.set_yticks(np.arange(len(label_classes) + 1) - .5, minor=True)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    plt.show()
+
 def gaussian_kernel(x1, x2, sigma=5):
-    return np.exp(-np.linalg.norm(x1 - x2)**2 / (2 * (sigma ** 2)))
+    return np.exp(-np.linalg.norm(x1 - x2, axis=-1)**2 / (2 * (sigma ** 2)))
+
 
 def minist_svm_train(X, y, c, sigma):
     train_size = X.shape[0]
     K = np.zeros((train_size, train_size))
+    tmp = np.zeros_like(X)
     for i in range(train_size):
-        for j in range(train_size):
-            K[i, j]= gaussian_kernel(X[i], X[j], sigma)
+        tmp[:] = X[i]
+        K[i]= gaussian_kernel(X, tmp, sigma)
     P = cvxopt.matrix((y @ y.T) * K)
     q = cvxopt.matrix(-np.ones((train_size, 1)))
     G = cvxopt.matrix(np.vstack((-np.eye(train_size), np.eye(train_size))))
@@ -19,6 +32,7 @@ def minist_svm_train(X, y, c, sigma):
     sol = cvxopt.solvers.qp(P, q, G, h)
     alpha = np.array(sol['x'])
     return alpha
+
 
 def mnist_svm_predict(test_X, train_X, train_y, alphas, sigma):
     label_types_num = len(alphas)
@@ -33,24 +47,15 @@ def mnist_svm_predict(test_X, train_X, train_y, alphas, sigma):
         X_test_size = test_X.shape[0]
         X_sv_size = alpha_sv.shape[0]
         y_pred = np.zeros(X_test_size)
+
+        tmp = np.zeros_like(X_train_sv)
         for i in range(X_test_size):
-            tmp = 0
-            for j in range(X_sv_size):
-                tmp += alpha_sv[j] * y_train_sv[j] * gaussian_kernel(test_X[i], X_train_sv[j], sigma)
-            y_pred[i] = tmp
+            tmp[:] = test_X[i]
+            y_pred[i] = np.sum(alpha_sv * y_train_sv * gaussian_kernel(tmp, X_train_sv, sigma).reshape((-1, 1)))
         y_pred_all[:, label_now] = y_pred
         label_now += 1
     y_pred = np.argmax(y_pred_all, axis=1).reshape((-1, 1))
-    y_pred += 1
     return y_pred
-
-def compute_accuracy(y, y_pred):
-    data_size = y.shape[0]
-    if data_size != y_pred.shape[0]:
-        return 0
-    true_num = y[(y - y_pred)==0].shape[0]
-    acc = true_num / data_size
-    return acc
 
 def read_data_mfeat(data_label_file):
     data = np.genfromtxt(data_label_file, delimiter=',', skip_header=1)
@@ -68,8 +73,7 @@ def one_vs_all(X_train, y_train, X_test, y_test, C, label_types):
         alpha = minist_svm_train(X_train, y_binary, C, sigma)
         alphas.append(alpha)
     y_pred = mnist_svm_predict(X_test, X_train, y_train, alphas, sigma)
-    acc = compute_accuracy(y_test, y_pred)
-    return acc
+    return y_pred
 
 if __name__ == "__main__":
     mnist_train_X, mnist_train_y = read_data_mfeat('mfeat_train.csv')
@@ -78,10 +82,19 @@ if __name__ == "__main__":
     train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
     label_types = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     for c in c_list:
-        test_accuracy = \
+        y_pred = \
             one_vs_all(mnist_train_X, mnist_train_y, mnist_test_X, mnist_test_y, c, label_types)
-        test_accuracy_list.append(test_accuracy)
-    print(test_accuracy_list)
-    plt.plot(test_accuracy_list, label='test')
-    plt.legend()
-    plt.show()
+        acc = 0
+        confusion = np.zeros((10, 10))
+        num_test = mnist_test_X.shape[1]
+        for i in range(num_test):
+            confusion[y_pred[i], mnist_test_y[i, 0] - 1] += 1
+
+            if y_pred[i] == mnist_test_y[i, 0] - 1:
+                acc = acc + 1
+        accuracy = acc / num_test
+        for i in range(10):
+            confusion[:, i] = confusion[:, i] / np.sum(confusion[:, i])
+        label_classes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+        visualize_confusion_matrix(confusion, accuracy, label_classes, 'Single-layer Perceptron Confusion Matrix')
+
