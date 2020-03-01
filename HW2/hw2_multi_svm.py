@@ -65,7 +65,7 @@ def read_data_mfeat(data_label_file):
 
 def one_vs_all(X_train, y_train, X_test, y_test, C, label_types):
     data_len = y_train.shape[0]
-    sigma = 5
+    sigma = 1
     alphas = []
     for label in label_types:
         y_binary = np.ones((data_len, 1))
@@ -78,7 +78,7 @@ def one_vs_all(X_train, y_train, X_test, y_test, C, label_types):
 if __name__ == "__main__":
     mnist_train_X, mnist_train_y = read_data_mfeat('mfeat_train.csv')
     mnist_test_X, mnist_test_y = read_data_mfeat('mfeat_test.csv')
-    c_list = [10]
+    c_list = [1]
     train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
     label_types = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     for c in c_list:

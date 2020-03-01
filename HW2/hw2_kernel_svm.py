@@ -6,6 +6,18 @@ import cvxopt
 def gaussian_kernel(x1, x2, sigma=5):
     return np.exp(-np.linalg.norm(x1 - x2, axis=-1)**2 / (2 * (sigma ** 2)))
 
+def visualize_heat_map(c_list, sigma_list, accuracy, name):
+    plt.title("{}".format(name))
+    plt.imshow(accuracy.T)
+    ax, fig = plt.gca(), plt.gcf()
+    plt.xticks(np.arange(len(c_list)), c_list)
+    plt.yticks(np.arange(len(sigma_list)), sigma_list)
+    plt.colorbar()
+    ax.set_xticks(np.arange(len(c_list) + 1) - .5, minor=True)
+    ax.set_yticks(np.arange(len(sigma_list) + 1) - .5, minor=True)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    plt.show()
+
 def rbf_svm_train(X, y, c, sigma):
     train_size = X.shape[0]
     K = np.zeros((train_size, train_size))
@@ -60,13 +72,12 @@ def compute_accuracy(y, y_pred):
     return acc
 
 
-def k_fold_cv(traindata, testdata, k, c):
+def k_fold_cv(traindata, testdata, k, c, sigma=5):
     X_test = testdata[:, 0: 2]
     y_test = testdata[:, -1].reshape((-1, 1))
     X_train_all = traindata[:, 0: 2]
     y_train_all = traindata[:, -1].reshape((-1, 1))
     train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
-    sigma = 5
     for i in range(k):
         X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i)
         alpha = rbf_svm_train(X_train, y_train, c, sigma)
@@ -109,17 +120,24 @@ if __name__ == "__main__":
     data_label = read_data_rd(data_label_file)
     data_label_train, data_label_test = split_data_rd(data_label, 0.2)
     c_list = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000]
-    train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
-    for c in c_list:
-        train_accuracy, cv_accuracy, test_accuracy = k_fold_cv(data_label_train, data_label_test, 8, c)
-        train_accuracy_list.append(train_accuracy)
-        cv_accuracy_list.append(cv_accuracy)
-        test_accuracy_list.append(test_accuracy)
+    sigma_list = [0.001, 0.005, 0.5, 5, 15, 50, 100, 500]
+    c_len = len(c_list)
+    s_len = len(sigma_list)
+    train_accuracy_list, cv_accuracy_list, test_accuracy_list = \
+        np.zeros((c_len, s_len)), np.zeros((c_len, s_len)), np.zeros((c_len, s_len))
+    for i in range(c_len):
+        for j in range(s_len):
+            train_accuracy, cv_accuracy, test_accuracy = \
+                k_fold_cv(data_label_train, data_label_test, 8, c_list[i], sigma_list[j])
+            train_accuracy_list[i, j] = train_accuracy
+            cv_accuracy_list[i, j] = cv_accuracy
+            test_accuracy_list[i, j] =test_accuracy
+    c_list_label = ['0.0001','0.001','0.01','0.1','1','10','100','1000']
+    sigma_list_label = ['0.001','0.005','0.5','5','15','50','100','500']
+    visualize_heat_map(c_list_label, sigma_list_label, train_accuracy_list, 'training accuracy heat map')
+    visualize_heat_map(c_list_label, sigma_list_label, cv_accuracy_list, 'cv accuracy heat map')
+    visualize_heat_map(c_list_label, sigma_list_label, test_accuracy_list, 'test accuracy heat map')
     print(train_accuracy_list)
     print(test_accuracy_list)
     print(cv_accuracy_list)
-    plt.plot(train_accuracy_list, label='train')
-    plt.plot(test_accuracy_list, label='test')
-    plt.plot(cv_accuracy_list, label='cv')
-    plt.legend()
-    plt.show()
+

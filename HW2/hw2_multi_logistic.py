@@ -55,7 +55,7 @@ def fc_backward(dl_dy, x, w, b, y):
 
 
 # train single layer perceptron
-def minist_train(X, y, learning_rate=0.32):
+def minist_train(X, y, learning_rate = 1.5):
     # TO DO
     mini_batch_x = X
     mini_batch_y = y
