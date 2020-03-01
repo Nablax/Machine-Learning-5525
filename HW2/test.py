@@ -1,155 +1,93 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[3]:
-
-
-global k
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import cvxopt
-from matplotlib import pyplot as plt
-data_1=pd.read_csv("mfeat_train.csv",index_col=0).to_numpy()
-data_2=pd.read_csv("mfeat_test.csv",index_col=0).to_numpy()
-[m,n]=data_1.shape
-#we have 10 classes, 1 - 10, and we want to make it 0-9, which is easier to operate
-data_1[:,n-1]-=1
-data_2[:,n-1]-=1
-train_x=data_1[:,:n-1]
-train_y=data_1[:,n-1].reshape(-1,1)
-test_y=data_2[:,n-1].reshape(-1,1)
-test_x=data_2[:,:n-1]
-k=len(np.unique(train_y)) #k=10
-print (np.unique(train_y))
-print (np.unique(test_y))
-#we need 10 datasets here to do 10 SVM, so we need to devide them based on their classes(labels)-->divide data function
 
-
-# In[4]:
-
-
-def rbf(X1,X2,sigma):
-    return np.exp(-np.linalg.norm(X1-X2, axis=-1)**2/(2*sigma**2))
-
-
-# In[5]:
-
-
-def rbf_svm_train(X,y,c=1,sigma=1):#return Alpha
-    [m, n]=X.shape
-    y=y.reshape(-1,1)*1. #make it float
-    Gram=np.zeros((m,m))
-    count=0
-    tmp = np.zeros((m, n))
-    for i in range(m):
-        tmp[:] = X[i]
-        Gram[i]=rbf(tmp,X,sigma) #kernel
-        count+=1
+def svmfit(X, y, c):
+    train_size = X.shape[0]
+    y_m_X_train = y * X
+    P = cvxopt.matrix(y_m_X_train.dot(y_m_X_train.T))
+    q = cvxopt.matrix(-np.ones((train_size, 1)))
+    G = cvxopt.matrix(np.vstack((-np.eye(train_size),np.eye(train_size))))
+    h = cvxopt.matrix(np.hstack((np.zeros(train_size), np.ones(train_size) * c)))
     cvxopt.solvers.options['show_progress'] = False
-    P=cvxopt.matrix(np.outer(y,y)*Gram)
-    q=cvxopt.matrix(-np.ones((m,1)))
-    G=cvxopt.matrix(np.vstack((np.eye(m)*-1,np.eye(m))))
-    h=cvxopt.matrix(np.hstack((np.zeros(m), np.ones(m) * c)))
-    ans=cvxopt.solvers.qp(P,q,G,h)
-    alpha=np.array(ans['x'])
-    return alpha
+    sol = cvxopt.solvers.qp(P, q, G, h)
+    lambda_sol = np.array(sol['x'])
+    w = ((y * lambda_sol).T @ X).reshape(-1, 1)
+    return w
 
 
-# In[6]:
+def predict(X, w):
+    y_pred = np.sign(X @ w)
+    return y_pred
+
+def compute_accuracy(y, y_pred):
+    data_size = y.shape[0]
+    if data_size != y_pred.shape[0]:
+        return 0
+    true_num = y[(y - y_pred)==0].shape[0]
+    acc = true_num / data_size
+    return acc
 
 
-def predict(test_X,train_X,train_y,alpha,sigma=1):
-    len1=test_X.shape[0]
-    len2=train_X.shape[0]
-    Gram=np.zeros((len1,len2))
-    tmp = np.zeros((len2, 64))
-    for i in range(len1):
-        tmp[:] = test_X[i]
-        Gram[i]=rbf(tmp,train_X,sigma)
-    label= Gram @ (alpha*train_y)
-    return label #predict based on 1 model
-
-
-# In[7]:
-
-
-def dividedata(data_1):
-    temp=data_1.copy()
-    xdict=dict()
-    ydict=dict()
+def k_fold_cv(traindata, testdata, k, c):
+    X_test = testdata[:, 0: 2]
+    y_test = testdata[:, -1].reshape((-1, 1))
+    X_train_all = traindata[:, 0: 2]
+    y_train_all = traindata[:, -1].reshape((-1, 1))
+    train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
     for i in range(k):
-        ydict[i]=np.where(temp[:,64]==i,1,0).reshape(-1,1) #1-10
-        xdict[i]=temp[:,:64]
-    return xdict,ydict #successful after test
+        X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i)
+        w = svmfit(X_train, y_train, c)
+        y_pred_train = predict(X_train, w)
+        y_pred_valid = predict(X_valid, w)
+        y_pred_test = predict(X_test, w)
+        train_accuracy_list.append(compute_accuracy(y_train, y_pred_train))
+        cv_accuracy_list.append(compute_accuracy(y_valid, y_pred_valid))
+        test_accuracy_list.append(compute_accuracy(y_test, y_pred_test))
+    train_accuracy = np.mean(train_accuracy_list)
+    cv_accuracy = np.mean(cv_accuracy_list)
+    test_accuracy = np.mean(test_accuracy_list)
+    return train_accuracy, cv_accuracy, test_accuracy
 
+def get_next_train_valid(X_shuffled, y_shuffled, k, part_num = 8):
+    val_id = k # the number of the block
+    block_size = int(X_shuffled.shape[0] / part_num)
+    X_valid = X_shuffled[block_size * val_id: block_size * (val_id + 1), :]
+    y_valid = y_shuffled[block_size * val_id: block_size * (val_id + 1), :]
+    X_train = np.vstack((X_shuffled[0: block_size * val_id, :], X_shuffled[block_size * (val_id + 1):, :] ))
+    y_train = np.vstack((y_shuffled[0: block_size * val_id, :], y_shuffled[block_size * (val_id + 1):, :]))
+    return X_train, y_train, X_valid, y_valid
 
-# In[8]:
+def read_data_rd(data_label_file):
+    data_label = np.genfromtxt(data_label_file, delimiter=',')
+    np.random.shuffle(data_label)
+    return data_label
 
+def split_data_rd(data_label, test_percent):
+    if test_percent < 0 or test_percent > 0.5:
+        test_percent = 0.2
+    data_size = data_label.shape[0]
+    test_nums = int(data_size * test_percent)
+    data_label_train = data_label[test_nums: data_size, :]
+    data_label_test = data_label[0: test_nums, :]
+    return data_label_train, data_label_test
 
-#print (xdict[0].shape)
-#x_train=xdict[0]
-#y_train=ydict[0]
-#print (rbf_svm_train(x_train,y_train).shape)
-
-
-# In[9]:
-
-
-def getlabel(data_1,test_X): #we keep all trained weights in this step.
-    xdict,ydict=dividedata(data_1)
-    label=np.zeros((test_X.shape[0],1))
-    final_weight=np.zeros((data_1.shape[0],1))
-    for i in range(k):
-        print (i)
-        x_train=xdict[i]
-        y_train=ydict[i].reshape(-1,1)
-        alpha=rbf_svm_train(x_train,y_train) #predict on all models and combine
-        #final_weight=np.concatenate((final_weight,alpha),axis=1) #combine all the alpha
-        if(i==0):
-            label=predict(test_X,x_train,y_train,alpha).reshape(-1,1)
-            final_weight=alpha
-        else:
-            label=np.concatenate((label,predict(test_X,x_train,y_train,alpha).reshape(-1,1)),axis=1)
-            final_weight=np.concatenate((final_weight,alpha.reshape(-1,1)),axis=1)
-    y_pred=np.argmax(label, axis=1)
-    return y_pred,final_weight #we do not need column #1 since it is used for intialization
-
-
-# In[10]:
-
-
-def err(label,test_y):
-    return np.count_nonzero(label-test_y)/len(test_y)
-
-
-# In[11]:
-
-
-def confusion(label,test_y):
-    conf=np.zeros((k,k))
-    for i in range(len(label)):
-        conf[int(test_y[i]),int(label[i])]+=1 #Actual and predicted class
-    return conf
-
-
-# In[12]:
-
-
-label,weight=getlabel(data_1,test_x)
-print (weight.shape)
-
-
-# In[13]:
-
-
-label=label.reshape(-1,1)
-print (1-err(label,test_y))
-print (confusion(label,test_y))
-np.savetxt("problem7_weight",weight)
-
-
-# In[ ]:
-
-
-
-
+if __name__ == "__main__":
+    data_label_file = 'hw2data.csv'
+    data_label = read_data_rd(data_label_file)
+    data_label_train, data_label_test = split_data_rd(data_label, 0.2)
+    c_list = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000]
+    train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
+    for c in c_list:
+        train_accuracy, cv_accuracy, test_accuracy = k_fold_cv(data_label_train, data_label_test, 8, c)
+        train_accuracy_list.append(train_accuracy)
+        cv_accuracy_list.append(cv_accuracy)
+        test_accuracy_list.append(test_accuracy)
+    c_list_label = ['0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000']
+    plt.xticks(np.arange(len(c_list_label)), c_list_label)
+    plt.plot(train_accuracy_list, label='train')
+    plt.plot(test_accuracy_list, label='test')
+    plt.plot(cv_accuracy_list, label='cv')
+    plt.legend()
+    plt.show()

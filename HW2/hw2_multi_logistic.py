@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 def visualize_confusion_matrix(confusion, accuracy, label_classes, name):
     plt.title("{}, accuracy = {:.3f}".format(name, accuracy))
     plt.imshow(confusion)
+    plt.colorbar()
     ax, fig = plt.gca(), plt.gcf()
     plt.xticks(np.arange(len(label_classes)), label_classes)
     plt.yticks(np.arange(len(label_classes)), label_classes)
@@ -109,7 +110,8 @@ if __name__ == '__main__':
     batch_size = 30
     mini_batch_x, mini_batch_y = get_mini_batch(mnist_train_X, mnist_train_y, batch_size)
     w, b = minist_train(mini_batch_x, mini_batch_y)
-    # sio.savemat('slp.mat', mdict={'w': w, 'b': b})
+    np.savetxt('problem_6_weights', w)
+    np.savetxt('problem_6_bias', b)
     y_pred = minist_predict(w, b, mnist_test_X)
     acc = 0
     confusion = np.zeros((10, 10))
@@ -124,5 +126,5 @@ if __name__ == '__main__':
         confusion[:, i] = confusion[:, i] / np.sum(confusion[:, i])
 
     label_classes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
-    visualize_confusion_matrix(confusion, accuracy, label_classes, 'Single-layer Perceptron Confusion Matrix')
+    visualize_confusion_matrix(confusion, accuracy, label_classes, 'Multi-class logistic regression')
 

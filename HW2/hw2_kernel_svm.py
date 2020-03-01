@@ -8,13 +8,15 @@ def gaussian_kernel(x1, x2, sigma=5):
 
 def visualize_heat_map(c_list, sigma_list, accuracy, name):
     plt.title("{}".format(name))
-    plt.imshow(accuracy.T)
+    plt.imshow(1 - accuracy)
     ax, fig = plt.gca(), plt.gcf()
-    plt.xticks(np.arange(len(c_list)), c_list)
-    plt.yticks(np.arange(len(sigma_list)), sigma_list)
+    plt.yticks(np.arange(len(c_list)), c_list)
+    plt.xticks(np.arange(len(sigma_list)), sigma_list)
+    plt.xlabel('sigma')
+    plt.ylabel('C')
     plt.colorbar()
-    ax.set_xticks(np.arange(len(c_list) + 1) - .5, minor=True)
-    ax.set_yticks(np.arange(len(sigma_list) + 1) - .5, minor=True)
+    ax.set_yticks(np.arange(len(c_list) + 1) - .5, minor=True)
+    ax.set_xticks(np.arange(len(sigma_list) + 1) - .5, minor=True)
     ax.tick_params(which="minor", bottom=False, left=False)
     plt.show()
 
@@ -41,21 +43,6 @@ def predict(test_X, train_X, train_y, alpha, sigma):
     X_test_size = test_X.shape[0]
     X_sv_size = alpha_sv.shape[0]
     y_pred = np.zeros((X_test_size, 1))
-    for i in range(X_test_size):
-        tmp = 0
-        for j in range(X_sv_size):
-            tmp += alpha_sv[j] * y_train_sv[j] * gaussian_kernel(test_X[i], X_train_sv[j], sigma)
-        y_pred[i]=np.sign(tmp)
-    return y_pred
-
-def predict2(test_X, train_X, train_y, alpha, sigma):
-    sv = (alpha > 1e-5).flatten()
-    alpha_sv = alpha[sv]
-    y_train_sv = train_y[sv].reshape(-1, 1)
-    X_train_sv = train_X[sv]
-    X_test_size = test_X.shape[0]
-    X_sv_size = alpha_sv.shape[0]
-    y_pred = np.zeros((X_test_size, 1))
     tmp = np.zeros_like(X_train_sv)
     for i in range(X_test_size):
         tmp[:] = test_X[i]
@@ -71,28 +58,34 @@ def compute_accuracy(y, y_pred):
     acc = true_num / data_size
     return acc
 
-
-def k_fold_cv(traindata, testdata, k, c, sigma=5):
+def k_fold_best(traindata, testdata, k, c, sigma):
     X_test = testdata[:, 0: 2]
     y_test = testdata[:, -1].reshape((-1, 1))
     X_train_all = traindata[:, 0: 2]
     y_train_all = traindata[:, -1].reshape((-1, 1))
-    train_accuracy_list, cv_accuracy_list, test_accuracy_list = [], [], []
+    cv_error_list, test_error_list = [], []
     for i in range(k):
-        X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i)
+        X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i, k)
         alpha = rbf_svm_train(X_train, y_train, c, sigma)
-        y_pred_train = predict2(X_train, X_train, y_train, alpha, sigma)
-        y_pred_valid = predict2(X_valid, X_train, y_train, alpha, sigma)
-        y_pred_test = predict2(X_test, X_train, y_train, alpha, sigma)
-        train_accuracy_list.append(compute_accuracy(y_train, y_pred_train))
-        cv_accuracy_list.append(compute_accuracy(y_valid, y_pred_valid))
-        test_accuracy_list.append(compute_accuracy(y_test, y_pred_test))
-    train_accuracy = np.mean(train_accuracy_list)
-    cv_accuracy = np.mean(cv_accuracy_list)
-    test_accuracy = np.mean(test_accuracy_list)
-    return train_accuracy, cv_accuracy, test_accuracy
+        y_pred_valid = predict(X_valid, X_train, y_train, alpha, sigma)
+        y_pred_test = predict(X_test, X_train, y_train, alpha, sigma)
+        cv_error_list.append(1 - compute_accuracy(y_valid, y_pred_valid))
+        test_error_list.append(1 - compute_accuracy(y_test, y_pred_test))
+    return cv_error_list, test_error_list
 
-def get_next_train_valid(X_shuffled, y_shuffled, k, part_num = 8):
+def k_fold_cv(traindata, k, c, sigma):
+    X_train_all = traindata[:, 0: 2]
+    y_train_all = traindata[:, -1].reshape((-1, 1))
+    cv_accuracy_list = []
+    for i in range(k):
+        X_train, y_train, X_valid, y_valid = get_next_train_valid(X_train_all, y_train_all, i, k)
+        alpha = rbf_svm_train(X_train, y_train, c, sigma)
+        y_pred_valid = predict(X_valid, X_train, y_train, alpha, sigma)
+        cv_accuracy_list.append(compute_accuracy(y_valid, y_pred_valid))
+    cv_accuracy = np.mean(cv_accuracy_list)
+    return cv_accuracy
+
+def get_next_train_valid(X_shuffled, y_shuffled, k, part_num):
     val_id = k # the number of the block
     block_size = int(X_shuffled.shape[0] / part_num)
     X_valid = X_shuffled[block_size * val_id: block_size * (val_id + 1), :]
@@ -120,24 +113,30 @@ if __name__ == "__main__":
     data_label = read_data_rd(data_label_file)
     data_label_train, data_label_test = split_data_rd(data_label, 0.2)
     c_list = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000]
-    sigma_list = [0.001, 0.005, 0.5, 5, 15, 50, 100, 500]
+    sigma_list = [0.5, 5, 15, 50]
     c_len = len(c_list)
     s_len = len(sigma_list)
+    k = 10
     train_accuracy_list, cv_accuracy_list, test_accuracy_list = \
         np.zeros((c_len, s_len)), np.zeros((c_len, s_len)), np.zeros((c_len, s_len))
     for i in range(c_len):
         for j in range(s_len):
-            train_accuracy, cv_accuracy, test_accuracy = \
-                k_fold_cv(data_label_train, data_label_test, 8, c_list[i], sigma_list[j])
-            train_accuracy_list[i, j] = train_accuracy
+            cv_accuracy = \
+                k_fold_cv(data_label_train, k, c_list[i], sigma_list[j])
             cv_accuracy_list[i, j] = cv_accuracy
-            test_accuracy_list[i, j] =test_accuracy
     c_list_label = ['0.0001','0.001','0.01','0.1','1','10','100','1000']
-    sigma_list_label = ['0.001','0.005','0.5','5','15','50','100','500']
-    visualize_heat_map(c_list_label, sigma_list_label, train_accuracy_list, 'training accuracy heat map')
-    visualize_heat_map(c_list_label, sigma_list_label, cv_accuracy_list, 'cv accuracy heat map')
-    visualize_heat_map(c_list_label, sigma_list_label, test_accuracy_list, 'test accuracy heat map')
-    print(train_accuracy_list)
-    print(test_accuracy_list)
+    sigma_list_label = ['0.5','5','15','50']
+    visualize_heat_map(c_list_label, sigma_list_label, cv_accuracy_list, 'cv error heat map')
     print(cv_accuracy_list)
+    c_best_at, s_best_at = np.unravel_index(np.argmax(cv_accuracy_list),cv_accuracy_list.shape)
+    print(c_best_at, s_best_at)
+    cv_error_list, test_error_list = \
+        k_fold_best(data_label_train, data_label_test, k, c_list[c_best_at], sigma_list[s_best_at])
+
+    plt.plot(test_error_list, label='test')
+    plt.plot(cv_error_list, label='cv')
+    plt.xlabel('folds')
+    plt.ylabel('errors')
+    plt.legend()
+    plt.show()
 
