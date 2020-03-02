@@ -22,8 +22,8 @@ def get_mini_batch(im_train, label_train, batch_size):
     mini_batch_x = np.zeros((rd_size, data_row, batch_size))
     mini_batch_y = np.zeros((rd_size, 10, batch_size))
     rd_seed = np.arange(rd_size)
-    # In this case rd_seed = range(375), mini batch will be 375 * 196 * 32, In the nth Iteration,
-    # I shuffle the rd_seed and put im_train[375 * n + rd_seed[j]] into the nth element in every mini_batch
+    # In this case rd_seed = range(24), mini batch will be 24 * 64 * 30, In the nth Iteration,
+    # I shuffle the rd_seed and put im_train[24 * n + rd_seed[j]] into the nth element in every mini_batch
     for i in range(batch_size):
         np.random.shuffle(rd_seed)
         for j in range(rd_size):

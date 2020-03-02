@@ -6,6 +6,7 @@ import cvxopt
 def gaussian_kernel(x1, x2, sigma=5):
     return np.exp(-np.linalg.norm(x1 - x2, axis=-1)**2 / (2 * (sigma ** 2)))
 
+# draw heat map
 def visualize_heat_map(c_list, sigma_list, accuracy, name):
     plt.title("{}".format(name))
     plt.imshow(1 - accuracy)
@@ -20,6 +21,7 @@ def visualize_heat_map(c_list, sigma_list, accuracy, name):
     ax.tick_params(which="minor", bottom=False, left=False)
     plt.show()
 
+# training and find alpha
 def rbf_svm_train(X, y, c, sigma):
     train_size = X.shape[0]
     K = np.zeros((train_size, train_size))
@@ -35,6 +37,7 @@ def rbf_svm_train(X, y, c, sigma):
     alpha = np.array(sol['x'])
     return alpha
 
+# predict with alpha
 def predict(test_X, train_X, train_y, alpha, sigma):
     sv = (alpha > 1e-5).flatten()
     alpha_sv = alpha[sv]
@@ -50,6 +53,7 @@ def predict(test_X, train_X, train_y, alpha, sigma):
     y_pred = np.sign(y_pred)
     return y_pred
 
+# compute accuracy
 def compute_accuracy(y, y_pred):
     data_size = y.shape[0]
     if data_size != y_pred.shape[0]:
@@ -58,6 +62,7 @@ def compute_accuracy(y, y_pred):
     acc = true_num / data_size
     return acc
 
+# after finding the best sigma and c, compute the validation error and test error here
 def k_fold_best(traindata, testdata, k, c, sigma):
     X_test = testdata[:, 0: 2]
     y_test = testdata[:, -1].reshape((-1, 1))
@@ -73,6 +78,7 @@ def k_fold_best(traindata, testdata, k, c, sigma):
         test_error_list.append(1 - compute_accuracy(y_test, y_pred_test))
     return cv_error_list, test_error_list
 
+# cross validation to find best sigma and c
 def k_fold_cv(traindata, k, c, sigma):
     X_train_all = traindata[:, 0: 2]
     y_train_all = traindata[:, -1].reshape((-1, 1))
@@ -85,6 +91,7 @@ def k_fold_cv(traindata, k, c, sigma):
     cv_accuracy = np.mean(cv_accuracy_list)
     return cv_accuracy
 
+# get next validation set
 def get_next_train_valid(X_shuffled, y_shuffled, k, part_num):
     val_id = k # the number of the block
     block_size = int(X_shuffled.shape[0] / part_num)
@@ -94,11 +101,13 @@ def get_next_train_valid(X_shuffled, y_shuffled, k, part_num):
     y_train = np.vstack((y_shuffled[0: block_size * val_id, :], y_shuffled[block_size * (val_id + 1):, :]))
     return X_train, y_train, X_valid, y_valid
 
+# read data randomly
 def read_data_rd(data_label_file):
     data_label = np.genfromtxt(data_label_file, delimiter=',')
     np.random.shuffle(data_label)
     return data_label
 
+# split training data and test data
 def split_data_rd(data_label, test_percent):
     if test_percent < 0 or test_percent > 0.5:
         test_percent = 0.2

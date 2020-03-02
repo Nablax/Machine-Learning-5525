@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import cvxopt
 
+# visualize confusion matrix
 def visualize_confusion_matrix(confusion, accuracy, label_classes, name):
     plt.title("{}, accuracy = {:.3f}".format(name, accuracy))
     plt.imshow(confusion)
@@ -15,10 +16,11 @@ def visualize_confusion_matrix(confusion, accuracy, label_classes, name):
     ax.tick_params(which="minor", bottom=False, left=False)
     plt.show()
 
+# rbf kernel
 def gaussian_kernel(x1, x2, sigma):
     return np.exp(-np.linalg.norm(x1 - x2, axis=-1)**2 / (2 * (sigma ** 2)))
 
-
+# training
 def minist_svm_train(X, y, c, sigma):
     train_size = X.shape[0]
     K = np.zeros((train_size, train_size))
@@ -35,7 +37,7 @@ def minist_svm_train(X, y, c, sigma):
     alpha = np.array(sol['x'])
     return alpha
 
-
+# predict
 def mnist_svm_predict(test_X, train_X, train_y, alphas, sigma):
     label_types_num = alphas.shape[1]
     test_len = test_X.shape[0]
@@ -61,12 +63,14 @@ def mnist_svm_predict(test_X, train_X, train_y, alphas, sigma):
     y_pred = np.argmax(y_pred_all, axis=1).reshape((-1, 1))
     return y_pred
 
+# read data from mnist
 def read_data_mfeat(data_label_file):
     data = np.genfromtxt(data_label_file, delimiter=',', skip_header=1)
     X = data[:, 1: -1]
     y = data[:, -1].reshape((-1, 1)).astype(np.int)
     return X, y
 
+# save the alphas here
 def one_vs_all(X_train, y_train, X_test, C, sigma, label_types):
     data_len = y_train.shape[0]
     alphas = []
