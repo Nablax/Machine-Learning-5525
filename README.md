@@ -3,7 +3,7 @@ Repo for CSCI 5525, Machine Learning. Coding parts are introduced hereafter. Vis
 
 ## Quick start
 
-  pip install -r requirements.txt
+    pip install -r requirements.txt
 
 ## HW1
 + **Iterative Method for Least Squares Problem**
