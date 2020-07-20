@@ -2,6 +2,7 @@
 Repo for CSCI 5525, Machine Learning. Coding parts are introduced hereafter. Visual results will be attached if there's any.
 
 ## Quick start
+
   pip install -r requirements.txt
 
 ## HW1
